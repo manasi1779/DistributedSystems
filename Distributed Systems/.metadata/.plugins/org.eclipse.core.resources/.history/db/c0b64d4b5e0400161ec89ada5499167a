@@ -1,0 +1,274 @@
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.Scanner;
+
+public class RaymondAlgorithm implements Runnable{
+
+	public static void main(String[] args) {
+		RaymondAlgorithm ra = new RaymondAlgorithm(Integer.parseInt(args[0]));
+		ra.init();
+	}
+	
+	/**
+	 * 7 processes communicate with parent/children using the tree structure
+	 * process with id i, connects with process with id 2*i+1 and 2*i+2 
+	 */
+
+	static Object eventObject = new Object();
+	static HashMap<Integer, String> addressTable = new HashMap<Integer, String>();
+	static Socket[] connections = new Socket[3];
+	static volatile int holder;
+	static volatile ArrayList<Integer> queue = new ArrayList<Integer>(); 
+	static ObjectOutputStream[] oos = new ObjectOutputStream[3];
+	static Scanner[] scanners = new Scanner[3];
+	static BufferedWriter[] bw = new BufferedWriter[3];
+	static ObjectInputStream[] ios = new ObjectInputStream[3];
+	static int myIndex;
+//	private boolean notRequested = true;
+	static volatile Boolean usingData = false;
+	
+	static{
+		addressTable.put(0, "newyork.cs.rit.edu");
+		addressTable.put(1, "kansas.cs.rit.edu");
+		addressTable.put(2, "glados.cs.rit.edu");
+		addressTable.put(3, "buddy.cs.rit.edu");
+		addressTable.put(4, "doors.cs.rit.edu");
+		addressTable.put(5, "medusa.cs.rit.edu");
+		addressTable.put(6, "kinks.cs.rit.edu");
+	}
+	
+	public RaymondAlgorithm(int index){
+		myIndex = index;
+	}
+	
+	public void init(){
+		try {
+			ServerSocket server = new ServerSocket(9991 + myIndex);
+			if(myIndex>0){
+				connections[0] = server.accept();
+				System.out.println(connections[0]);
+				oos[0] = new ObjectOutputStream(connections[0].getOutputStream());
+				System.out.println(oos[0]);
+				bw[0] = new BufferedWriter(new PrintWriter(oos[0], true));
+				System.out.println(bw[0]);
+				ios[0] = new ObjectInputStream(connections[0].getInputStream());
+				scanners[0] = new Scanner(ios[0]);
+				Thread readPeer1 = new Thread(this, "readPeer1");
+				readPeer1.start();
+			}
+			//Initially 0th node has data. 
+			//Hence setting each parent as holder
+			//If holder is -ve, holder is root node itself!
+			//holder = (myIndex -1)/2;
+			if(myIndex ==0)
+				holder = -1;
+			else
+				holder = 0;
+			
+			//if(myIndex ==0)
+			if(myIndex<3){
+				for(int i = 1; i < 3; i++){
+					System.out.println("connecting to "+addressTable.get(myIndex*2+i)+" with "+(int)(9991+myIndex*2+i));
+					connections[i] = new Socket(addressTable.get(myIndex*2+i), 9991+myIndex*2+i);
+					System.out.println(connections[i]);
+					oos[i] = new ObjectOutputStream(connections[i].getOutputStream());
+					System.out.println(oos[i]);
+					bw[i] = new BufferedWriter(new PrintWriter(oos[i], true));
+					System.out.println(bw[i]);
+					ios[i] = new ObjectInputStream(connections[i].getInputStream());
+					scanners[i] = new Scanner(ios[i]);
+				}
+				Thread readPeer2 = new Thread(this, "readPeer2");
+				Thread readPeer3 = new Thread(this, "readPeer3");
+				readPeer2.start();
+				readPeer3.start();
+			}
+				Thread getSharedData = new Thread(this, "getSharedData");
+				getSharedData.start();		
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void getSharedData(){
+		System.out.println(holder+" "+queue.contains(-1));
+		if(!queue.contains(-1)){
+			if(holder < 0){
+				usingData = true;
+				useData();
+			}
+			else{
+				synchronized(eventObject){
+					queue.add(-1);
+					writeToChannel(holder, "DATA");
+					System.out.println("Requested");
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Whenever holder changes if queue is not empty, send request to new holder
+	 */
+	public void tokenReceived(){	
+		if(!queue.isEmpty()){
+			int requestor;
+			synchronized(eventObject){
+				requestor = queue.get(0);
+				queue.remove(0);
+			}
+			if(requestor < 0){
+				System.out.println("token received using it");
+				holder = -1;
+				usingData = true;
+				useData();
+			}
+			else{					
+				writeToChannel(requestor,"TOKEN");
+				System.out.println("Sent token to "+requestor);
+				holder = requestor;
+				if(!queue.isEmpty()){
+					writeToChannel(holder, "DATA");
+					System.out.println("Sent request to "+holder);
+				}
+			}
+		}
+		else{
+			System.out.println("Nobody in q, just stopped using shared data");
+		}
+	}
+	
+	/**
+	 * When a site receives a REQUEST message from another node it places the message in its queue 
+	 * and forwards a REQUEST message to the node that its local holder variable points to, 
+	 * provided that it has not already done so on behalf of a preceding message
+	 * 
+	 * When the root receives a REQUEST message from another node it adds the request to its queue, 
+	 * and when done with the token, sends the token to the requesting node at the top of its queue 
+	 * and redirects its holder variable to that node. If its request queue is not empty 
+	 * then it also sends a REQUEST to its holder node. 
+	 * @param channelNo
+	 */
+	public void requestReceived(int channelNo){
+		synchronized(eventObject){
+			queue.add(channelNo);
+		}
+		if(holder<0 && !usingData){
+			synchronized(eventObject){
+				writeToChannel(queue.get(0),"TOKEN");
+				System.out.println("Sent token to "+queue.get(0));
+				queue.remove(0);
+			}				
+			holder = channelNo;
+		}
+		else if(holder >= 0){
+			if(queue.size()==1)
+			writeToChannel(holder, "DATA");
+			System.out.println("Sent request to "+holder);
+		}		
+		else{
+			System.out.println("Reqquest qqueued");
+		}
+	}
+	
+	public void useData(){
+		Random ran = new Random();
+		try {
+			int delay = Math.abs(ran.nextInt(10000) - ran.nextInt(2000));
+			System.out.println("Using shared data");
+			Thread.sleep(delay);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		leaveData();		
+	}
+	
+	public void leaveData(){
+		usingData = false;
+		System.out.println("leaving data");
+		tokenReceived();
+	}
+	
+	/**
+	 * Writes command to outgoing channel 
+	 * @param channelNo
+	 * @param command
+	 */
+	public void writeToChannel(int channelNo, String command){
+		try {
+			bw[channelNo].write(command);
+			bw[channelNo].newLine();
+			bw[channelNo].flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void run() {
+		String name = Thread.currentThread().getName();
+		switch (name) {
+		case "readPeer1": {
+			while (true) {
+				readChannel(0);
+			}
+		}
+		case "readPeer2": {
+			while (true) {
+				readChannel(1);
+			}
+		}
+		case "readPeer3": {
+			while (true) {
+				readChannel(2);
+			}
+		}
+		case "getSharedData":{
+			while(true){
+				Random ran = new Random();
+				int delay = Math.abs(ran.nextInt(10000) - ran.nextInt(2000));
+				try {
+					Thread.sleep(delay);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				if(!usingData)
+				getSharedData();
+			}
+		}
+		default: {
+			System.out.println("default");
+			break;
+		}
+	}
+}
+
+	private void readChannel(int channelNo) {
+		while(!scanners[channelNo].hasNext());
+		String response = scanners[channelNo].nextLine();
+		switch(response){
+			case "TOKEN":{
+				tokenReceived();
+				break;
+			}
+			case "DATA":{
+				System.out.println("request received "+channelNo);
+				requestReceived(channelNo);
+				break;
+			}
+			default:{
+				System.out.println(response);
+				break;
+			}
+		}
+	}
+}

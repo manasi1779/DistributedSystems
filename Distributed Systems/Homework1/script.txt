@@ -1,0 +1,40 @@
+#!/bin/bash   
+username=msb4977
+passwd=Welcome12#
+
+for host in `cat login.txt`; 
+do 
+ssh $host $username;
+expect Password:
+send $passwd\r
+cd DistributedSystems/Homeworks/1
+java Server
+
+done
+
+#!/bin/bash   
+username=msb4977
+passwd=Welcome12#
+
+for host in `cat login.txt` 
+do 
+ssh $host $username;
+expect Password: 
+send $passwd
+cd DistributedSystems/Homeworks/1
+rmiregistry
+
+done
+
+sh $username@$host "expert; echo \"### $host ###\" >> output.txt; lspci | egrep -i --color 'network|ethernet' >> output.txt; scp output.txt $ADMIN_SERVER:$host-output.txt"
+
+#!/bin/bash   
+#!/usr/bin/expect
+username=msb4977
+passwd=Welcome12#
+for host in `cat login.txt`
+/usr/bin/expect << EOF
+spawn ssh $host
+expect "Password: "
+send "${passwd}"
+done

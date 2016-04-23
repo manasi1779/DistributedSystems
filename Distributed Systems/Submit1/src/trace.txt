@@ -1,0 +1,87 @@
+msb4977@kansas:~/DistributedSystems/Homeworks/1$ java Client
+Search Trail:
+kansas.cs.rit.edu
+medusa.cs.rit.edu
+glados.cs.rit.edu
+gorgon.cs.rit.edu
+gorgon.cs.rit.edu
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed
+^Z
+[17]+  Stopped                 java Client
+msb4977@kansas:~/DistributedSystems/Homeworks/1$ java Client
+Search Trail:
+kansas.cs.rit.edu
+kinks.cs.rit.edu
+doors.cs.rit.edu
+gorgon.cs.rit.edu
+gorgon.cs.rit.edu
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed
+^Z
+[18]+  Stopped                 java Client
+msb4977@kansas:~/DistributedSystems/Homeworks/1$ java Client
+Search Trail:
+kansas.cs.rit.edu
+buddy.cs.rit.edu
+doors.cs.rit.edu
+gorgon.cs.rit.edu
+gorgon.cs.rit.edu
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed
+^Z
+[19]+  Stopped                 java Client
+msb4977@kansas:~/DistributedSystems/Homeworks/1$ java Client
+Search Trail:
+kansas.cs.rit.edu
+medusa.cs.rit.edu
+glados.cs.rit.edu
+gorgon.cs.rit.edu
+gorgon.cs.rit.edu
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed
+^Z
+[20]+  Stopped                 java Client
+msb4977@kansas:~/DistributedSystems/Homeworks/1$ java Client
+Search Trail:
+kansas.cs.rit.edu
+medusa.cs.rit.edu
+glados.cs.rit.edu
+gorgon.cs.rit.edu
+gorgon.cs.rit.edu
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed
+^Z
+[21]+  Stopped                 java Client
+msb4977@kansas:~/DistributedSystems/Homeworks/1$ java Client
+Search Trail:
+kansas.cs.rit.edu
+medusa.cs.rit.edu
+glados.cs.rit.edu
+glados.cs.rit.edu
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed

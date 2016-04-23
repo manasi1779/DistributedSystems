@@ -1,0 +1,29 @@
+import java.util.HashMap;
+
+public class RaymondAlgorithm {
+
+	
+	
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	/**
+	 * 7 processes communicate with parent/children using the tree structure
+	 * process with id i, connects with process with id 2*i+1 and 2*i+2 
+	 */
+
+	static HashMap<String, Integer> addressTable = new HashMap<String, Integer>();
+	
+	static{
+		addressTable.put("kansas.cs.rit.edu", 9991);
+		addressTable.put("glados.cs.rit.edu", 9992);
+		addressTable.put("buddy.cs.rit.edu", 9993);
+		addressTable.put("doors.cs.rit.edu", 9994);
+		addressTable.put("medusa.cs.rit.edu", 9995);
+		addressTable.put(".cs.rit.edu", 9996);
+		addressTable.put("kansas.cs.rit.edu", 9997);
+	}
+	
+}

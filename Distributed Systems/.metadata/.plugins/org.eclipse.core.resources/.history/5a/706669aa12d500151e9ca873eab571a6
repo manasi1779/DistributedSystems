@@ -1,0 +1,31 @@
+import java.io.File;
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.util.HashMap;
+
+public interface ServerInterface extends Remote{
+	
+	public HashMap<Integer,String> IDTable = new HashMap<Integer,String>();
+	int numberOfServers = 7;
+	Init init = new Init();
+	
+//	public void addID(String ID);
+	
+	public File readFile(String fileName, int i, int j) throws RemoteException;
+	
+	public int getHash(String fileName, int i, int j)throws RemoteException;
+	
+	public void insertFile(String host, File fileName) throws RemoteException; 
+	
+	class Init{
+		static{
+			IDTable.put(0,"glados.rit.edu");
+			IDTable.put(1,"");
+			IDTable.put(2,"");
+			IDTable.put(3,"");
+			IDTable.put(4,"");
+			IDTable.put(5,"");
+			IDTable.put(7,"");
+		}
+	}	
+}

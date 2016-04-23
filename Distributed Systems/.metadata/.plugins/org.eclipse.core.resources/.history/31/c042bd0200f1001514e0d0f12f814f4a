@@ -1,0 +1,10 @@
+import java.io.Serializable;
+
+class Message implements Serializable{
+	String message;
+	int state;
+	
+	public Message(String message){
+		this.message = message;
+	}
+}

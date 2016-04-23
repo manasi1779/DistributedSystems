@@ -1,0 +1,9 @@
+class Event{
+	String event;
+	int lamportTime;
+	
+	public Event(String event, int time){
+		this.event = event;
+		this.lamportTime = time;
+	}
+}

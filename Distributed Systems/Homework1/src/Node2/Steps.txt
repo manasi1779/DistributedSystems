@@ -1,0 +1,6 @@
+1. Copy files to either of cs.rit.edu servers listed and compile.
+2. Start RMI registry for all 7 servers to same root where files are placed
+3. Run Server class on medusa.cs.rit.edu giving server name: medusa.cs.rit.edu as argument to insert the file
+4. Run Server on rest of the machines passign server names as argument
+5. Run client on any other instance
+6. Observe the trail followed by file displayed

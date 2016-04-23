@@ -1,0 +1,53 @@
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.util.HashMap;
+import java.util.Scanner;
+
+public class RaymondAlgorithm {
+
+	
+	
+	public static void main(String[] args) {
+		
+	}
+	
+	/**
+	 * 7 processes communicate with parent/children using the tree structure
+	 * process with id i, connects with process with id 2*i+1 and 2*i+2 
+	 */
+
+	static HashMap<Integer, String> addressTable = new HashMap<Integer, String>();
+	static ObjectOutputStream[] oos = new ObjectOutputStream[2];
+	static Scanner[] scanners = new Scanner[2];
+	static BufferedWriter[] bw = new BufferedWriter[2];
+	static ObjectInputStream[] ios = new ObjectInputStream[2];
+
+	int myIndex;
+	
+	static{
+		addressTable.put(0, "newyork.cs.rit.edu");
+		addressTable.put(1, "kansas.cs.rit.edu");
+		addressTable.put(2, "glados.cs.rit.edu");
+		addressTable.put(3, "buddy.cs.rit.edu");
+		addressTable.put(4, "doors.cs.rit.edu");
+		addressTable.put(5, "medusa.cs.rit.edu");
+		addressTable.put(6, "kinks.cs.rit.edu");
+	}
+	
+	public RaymondAlgorithm(int index){
+		myIndex = index;
+	}
+	
+	public void init(){
+		try {
+			ServerSocket server = new ServerSocket(9991 + myIndex);
+			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+}

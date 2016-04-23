@@ -1,0 +1,13 @@
+idaho.cs.rit.edu
+buddy.cs.rit.edu 
+glados.cs.rit.edu
+medusa.cs.rit.edu
+doors.cs.rit.edu
+gorgon.cs.rit.edu
+kinks.cs.rit.edu
+newyork.cs.rit.edu
+joplin.cs.rit.edu
+yes.cs.rit.edu
+holly.cs.rit.edu
+
+cd DistributedSystems//Homeworks//1

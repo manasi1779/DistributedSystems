@@ -1,0 +1,18 @@
+1. Create server program to handle GET file request
+	a> Client will send GET /index.html / HTTP/1.1 using stream
+	b> Server should send back response with header using stream
+		HTTP/1.1
+		Server:
+		Date:
+		Last-modified
+		Content-length:
+		Content-type:text/html
+		<test file data>
+	c>
+2. Create array of Server threads
+3. Treat this array as binary tree.
+4. Hard code the host table (IP - hostName) in request handler code.
+5. 
+
+
+Will the tree be always balanced binary tree

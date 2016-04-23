@@ -1,0 +1,153 @@
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.Scanner;
+
+public class RaymondAlgorithm implements Runnable{
+
+	public static void main(String[] args) {
+		RaymondAlgorithm ra = new RaymondAlgorithm(Integer.parseInt(args[0]));
+		ra.init();
+	}
+	
+	/**
+	 * 7 processes communicate with parent/children using the tree structure
+	 * process with id i, connects with process with id 2*i+1 and 2*i+2 
+	 */
+
+	static HashMap<Integer, String> addressTable = new HashMap<Integer, String>();
+	Socket[] connections = new Socket[3];
+	int holder;
+	String status;
+	ArrayList<Integer> queue = new ArrayList<Integer>(); 
+	static ObjectOutputStream[] oos = new ObjectOutputStream[3];
+	static Scanner[] scanners = new Scanner[3];
+	static BufferedWriter[] bw = new BufferedWriter[3];
+	static ObjectInputStream[] ios = new ObjectInputStream[3];
+	int myIndex;
+	
+	static{
+		addressTable.put(0, "newyork.cs.rit.edu");
+		addressTable.put(1, "kansas.cs.rit.edu");
+		addressTable.put(2, "glados.cs.rit.edu");
+		addressTable.put(3, "buddy.cs.rit.edu");
+		addressTable.put(4, "doors.cs.rit.edu");
+		addressTable.put(5, "medusa.cs.rit.edu");
+		addressTable.put(6, "kinks.cs.rit.edu");
+	}
+	
+	public RaymondAlgorithm(int index){
+		myIndex = index;
+	}
+	
+	public void init(){
+		try {
+			ServerSocket server = new ServerSocket(9991 + myIndex);
+			if(myIndex>0)
+				connections[0] = server.accept();
+			//if(myIndex<3)
+			if(myIndex ==0)
+			for(int i = 1; i < 3; i++){
+				connections[i] = new Socket(addressTable.get(myIndex*2+i), 9991+myIndex*2+i);
+				oos[i] = new ObjectOutputStream(connections[i].getOutputStream());
+				bw[i] = new BufferedWriter(new PrintWriter(oos[i]));
+				ios[i] = new ObjectInputStream(connections[i].getInputStream());;
+				scanners[i] = new Scanner(ios[i]);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void getSharedData(){
+		queue.add(-1);
+		writeToChannel(holder, "DATA");
+	}
+	
+	public void tokenReceived(){
+		if(queue.get(0) < 0)
+			useData();
+		else
+		writeToChannel(queue.get(0),"TOKEN");
+		holder = queue.get(0);
+		queue.remove(0);
+	}
+	
+	public void useData(){
+		Random ran = new Random();
+		try {
+			int delay = Math.abs(ran.nextInt(10000) - ran.nextInt(2000));
+			Thread.sleep(delay);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		leaveData();
+	}
+	
+	public void leaveData(){
+		tokenReceived();
+	}
+	
+	/**
+	 * Writes command to outgoing channel 
+	 * @param channelNo
+	 * @param command
+	 */
+	public void writeToChannel(int channelNo, String command){
+		try {
+			bw[channelNo].write(command);
+			bw[channelNo].newLine();
+			bw[channelNo].flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void run() {
+		String name = Thread.currentThread().getName();
+		switch (name) {
+		case "readPeer1": {
+			while (true) {
+				readChannel(0);
+			}
+			//break;
+		}
+		case "readPeer2": {
+			while (true) {
+				readChannel(1);
+			}
+			//break;
+		}
+		case "readPeer3": {
+			while (true) {
+				readChannel(2);
+			}
+			//break;
+		}
+		case "getSharedData":{
+			while(true){
+				getSharedData();
+			}
+		}
+		default: {
+			System.out.println("default");
+			break;
+		}
+	}
+}
+
+	private void readChannel(int channelNo) {
+		while(!scanners[channelNo].hasNext());
+		String response = scanners[channelNo].nextLine();
+		if(response.equals(""))
+	}
+	
+}

@@ -1,0 +1,189 @@
+/**
+ * The algorithm is defined through two rules, the marker receiving rule and the
+marker sending rule. The marker sending rule obligates processes to send
+a marker after they have recorded their state, but before they send any other messages.
+The marker receiving rule obligates a process that has not recorded its state to do
+so. In that case, this is the first marker that it has received. It notes which messages
+subsequently arrive on the other incoming channels. When a process that has already
+saved its state receives a marker (on another channel), it records the state of that channel
+as the set of messages it has received on it since it saved its state.
+ */
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Random;
+import java.util.Scanner;
+
+public class Snapshot implements Runnable{
+	static long initialTime;
+	Socket peer[] = new Socket[2];
+	ObjectOutputStream[] oos = new ObjectOutputStream[2];
+	Scanner[] s = new Scanner[2];
+	BufferedWriter[] bw = new BufferedWriter[2]; 
+	Message marker;
+	ObjectInputStream[] ios = new ObjectInputStream[2];
+	static int balance = 1000;
+	String processName;
+	String state;
+	
+	public Snapshot(String process){
+		processName = process;
+	}
+	
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+		Snapshot snapshot = new Snapshot(args[0]);
+	}
+	
+	public void start(){
+		try {
+			ServerSocket server = new ServerSocket(9991);
+			for(int i=0; i<2;i++){				
+				peer[i] = server.accept();
+				oos[i] = new ObjectOutputStream(peer[i].getOutputStream());
+				ios[i] = new ObjectInputStream(peer[i].getInputStream());
+				s[i] = new Scanner(ios[i]);
+				bw[i] = new BufferedWriter(new PrintWriter(oos[i]));
+			}	
+			initialTime = System.currentTimeMillis();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void withDraw(int amount){
+		balance -= amount;
+	}
+	
+	public void deposit(int amount){
+		balance += amount;
+	}
+	
+	public void sendMoney(int process, int amount){
+		try {
+			withDraw(amount);
+			oos[process].writeChars("SEND");
+			oos[process].writeInt(amount);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void getMoney(int process){
+		 int amount =0;
+		if(s[process].hasNext()){
+			 amount = s[process].nextInt();
+		}
+		deposit(amount);		
+	}
+	
+	public void readMarker(int process){
+		Message m;
+		if(s[process].hasNext()){
+				try {
+					m = (Message) ios[process].readObject();					
+				} catch (ClassNotFoundException | IOException e) {
+					e.printStackTrace();
+				}
+			}
+	}
+	
+	
+	public void transact(){
+			while(!state.equals("record")){
+				long currentTime = System.currentTimeMillis();
+				if(processName.equals("process1") && (currentTime - initialTime)%2000 == 0 ){
+					state = "record";
+				}			
+				if((currentTime - initialTime)%1000 == 0 ){
+					Random random = new Random();
+					sendMoney(random.nextInt(1),random.nextInt(balance/3));
+				}
+			}
+	}
+
+	public void getSnapShot(){
+		if(state.equals("record")){
+			recordState();
+			sendMarker();
+			state = "transact";
+			recordChannel();
+		}
+	}
+	
+	public void sendMarker() {
+		
+	}
+	
+	public void recordState(){
+		
+	}
+	
+	public void recordChannel(){
+		
+	}
+	
+	public void readChannel(int process){
+		while(!state.equals("record")){
+			if(s[process].hasNext()){
+				String command = s[process].nextLine();
+				if(command.equals("SEND")){
+					getMoney(0);
+				}
+				else{
+					readMarker(process);
+					state = "record";
+				}
+			}
+		}
+	}
+
+	@Override
+	public void run() {
+		String name = Thread.currentThread().getName();
+		switch(name){
+		case "readChannel1":{
+			while(true){
+				readChannel(0);
+			}
+		}
+		case "readChannel2":{
+			while(true){
+				readChannel(1);
+			}
+		}
+		case "writeChannel":{
+			while(true){
+				transact();
+			}
+		}
+		case "record":{
+			while(true){
+				getSnapShot();
+			}
+		}
+		}
+	}
+}
+
+class State{
+	Channel channels[];
+	public State(int noOfchannels){
+		channels = new Channel[noOfchannels];
+	}
+	
+	
+}
+
+class Channel{
+	
+}
+
+

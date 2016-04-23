@@ -1,0 +1,27 @@
+channel1
+send channel
+channel2
+transact
+transact
+not recordingtrue
+not recordingtrue
+sent money to 1
+record
+Exception in thread "readChannel2" java.util.InputMismatchException
+        at java.util.Scanner.throwFor(Unknown Source)
+        at java.util.Scanner.next(Unknown Source)
+        at java.util.Scanner.nextInt(Unknown Source)
+        at java.util.Scanner.nextInt(Unknown Source)
+        at Snapshot.getMoney(Snapshot.java:127)
+        at Snapshot.readChannel(Snapshot.java:228)
+        at Snapshot.run(Snapshot.java:260)
+        at java.lang.Thread.run(Unknown Source)
+Exception in thread "readChannel1" java.util.InputMismatchException
+        at java.util.Scanner.throwFor(Unknown Source)
+        at java.util.Scanner.next(Unknown Source)
+        at java.util.Scanner.nextInt(Unknown Source)
+        at java.util.Scanner.nextInt(Unknown Source)
+        at Snapshot.getMoney(Snapshot.java:127)
+        at Snapshot.readChannel(Snapshot.java:228)
+        at Snapshot.run(Snapshot.java:254)
+        at java.lang.Thread.run(Unknown Source)
