@@ -1,0 +1,32 @@
+	// Not required
+	private void swapWithSuccessor(Socket successor) {
+		try {
+			// Set new predecessor
+			String oldPredecessor = predecessorHostName;
+			predecessorHostName = successorHostName;
+			
+			// Pass own predecessor 
+			PrintWriter pw = new PrintWriter(successor.getOutputStream());
+			pw.println(predecessorHostName);
+			
+			// Get new successor
+			BufferedReader din = new BufferedReader (
+					new InputStreamReader (successor.getInputStream()));
+			String newSuccessor = din.readLine();
+			
+			// Contact new successor and add ownself as predecessor
+			Socket newSuccessorSocket = new Socket(newSuccessor, 54321);
+			PrintWriter newpw = new PrintWriter(newSuccessorSocket.getOutputStream());
+			newpw.println("changePredecessor");
+			newpw.println(InetAddress.getLocalHost().getHostName());
+			
+			// Contact predecessor and add new successor to it
+			Socket predecessor = new Socket(oldPredecessor, 54321);
+			PrintWriter oldPred = new PrintWriter(predecessor.getOutputStream());
+			oldPred.println("changeSuccessor");
+			oldPred.println(successorHostName);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}		
+	}
