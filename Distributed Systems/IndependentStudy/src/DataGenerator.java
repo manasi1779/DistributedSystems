@@ -24,7 +24,9 @@ public class DataGenerator extends Thread{
 	static String predecessorHostName;
 	static String successorHostName;
 	static ServerSocket serverSocket;
-	ServerSocket contextRoot;
+	static String rollingToken = null; 
+	static boolean needToken = false;
+	
 	//Fog Node
 	String rootHostName = "glados.cs.rit.edu";
 	
@@ -134,14 +136,22 @@ public class DataGenerator extends Thread{
 			case "changePredecessor":{
 				String data;
 				while((data = din.readLine()) == null);
-				predecessorHostName = data;
+				if(data.equals("null")){
+					predecessorHostName = null;
+					updateContextRoot();
+				}
+				else
+					predecessorHostName = data;				
 				System.out.println("Changed predecessor to "+predecessorHostName);
 				break;
 			}
 			case "changeSuccessor":{
 				String data;
 				while((data = din.readLine()) == null);
-				successorHostName = data;
+				if(data == "null")
+					successorHostName = null;
+				else
+					successorHostName = data;
 				System.out.println("Changed successor to "+successorHostName);
 				break;
 			}
@@ -172,11 +182,36 @@ public class DataGenerator extends Thread{
 				addIoT(socket);
 				break;
 			}
+			case "useToken":{
+				String rollingchanges;
+				while((rollingchanges = din.readLine()) == null);
+				if(needToken)
+					adjustPosition();
+				noOfChanges += Integer.parseInt(rollingchanges);
+				if(successorHostName != null){
+					Socket succ = new Socket(successorHostName, 12345);
+					PrintWriter newPw = new PrintWriter(succ.getOutputStream());
+					newPw.println("useToken");
+					newPw.println(noOfChanges);
+					succ.close();
+				}
+				else{
+					try(Socket rootsocket = new Socket(rootHostName, 12345)){
+						PrintWriter bw = new PrintWriter(rootsocket.getOutputStream(), true);
+						bw.println("releaseToken");	
+						bw.println(context);
+						bw.println(noOfChanges);
+					//	System.out.println("Sent update of "+noOfChanges);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				noOfChanges = 0; 
+			}
 		}}
 		catch(IOException e){
 			e.printStackTrace();
-		}
-	
+		}	
 	}
 	
 	public void run(){
@@ -221,8 +256,8 @@ public class DataGenerator extends Thread{
 	}
 	
 	public void updateEngine(){
-		try(Socket serversocket = new Socket(rootHostName, 12345)){
-			PrintWriter bw = new PrintWriter(serversocket.getOutputStream(), true);
+		try(Socket socket = new Socket(rootHostName, 12345)){
+			PrintWriter bw = new PrintWriter(socket.getOutputStream(), true);
 			bw.println(noOfChanges);			
 			System.out.println("Sent update of "+noOfChanges);
 		} catch (IOException e) {
@@ -263,7 +298,8 @@ public class DataGenerator extends Thread{
 		String oldSuccessor = successorHostName; 
 		System.out.println("Changing successor");
 		successorHostName = successor.getInetAddress().getHostName()+".cs.rit.edu";
-		try(Socket	oldSuccessorSocket = new Socket(oldSuccessor, 12345)){			
+		System.out.println("New successor "+successorHostName);
+		try(Socket oldSuccessorSocket = new Socket(oldSuccessor, 12345)){			
 			// update predecessor of successor as this new insert			;
 			PrintWriter oldSuccessorpw = new PrintWriter(oldSuccessorSocket.getOutputStream(), true);
 			oldSuccessorpw.println("changePredecessor");
@@ -289,9 +325,12 @@ public class DataGenerator extends Thread{
 		if(now - startTime > temporalCoherencyRequirement){
 			startTime = now;	
 			int oldValue = value;
-			value = random.nextInt(100);
+			synchronized(valueObject){
+				value = random.nextInt(100);			
+				if(Math.abs(oldValue-value) >= precisionCoherencyRequirement )
+					needToken = true;
+			}
 			System.out.println("Generated value "+value);
-			adjustPosition();			
 		}
 	}
 	
@@ -299,12 +338,18 @@ public class DataGenerator extends Thread{
 		try(Socket root = new Socket(rootHostName, 12345)){
 			PrintWriter bw = new PrintWriter(root.getOutputStream(), true);
 			bw.println("updateContextRoot");	
-			bw.println(context);
 			BufferedReader din = new BufferedReader (
 					new InputStreamReader (root.getInputStream()));			
 			String data;
 			while((data = din.readLine()) == null);
+			if(data.equals("getContext")){
+				System.out.println("Sending context root");
+				bw.println(context);
+			}
+			data = null;
+			while((data = din.readLine()) == null);
 			successorHostName = data;
+			System.out.println("Received successor "+data);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -331,17 +376,13 @@ public class DataGenerator extends Thread{
 				if(predecessorValue > value)
 					break;
 				noOfChanges++;
-				predecessorSocket = new Socket(predecessorHostName, 12345);
+				predecessorSocket.close();
+				predecessorSocket = new Socket(pred, 12345);
 				newpw = new PrintWriter(predecessorSocket.getOutputStream(), true);
 				newpw.println("getPredecessor");
 				pred = null;
-				while((pred = din.readLine()) == null);
-				if(pred.equals("null")){
-					System.out.println("Changing context root node");
-					updateContextRoot();
-					removeSelf();
-					return null;
-				}
+				while((pred = din.readLine()) == null);		
+				predecessorSocket.close();
 			}			
 						
 		} catch (IOException e) {
@@ -371,21 +412,41 @@ public class DataGenerator extends Thread{
 				noOfChanges++;
 				successorSocket.close();				
 				if(successorValue < value){
-					return succHostName;
-				}
+					if(noOfChanges == 1)						
+						return null;
+					else
+						return succHostName;
+				}				
 				successorSocket = new Socket(succHostName, 12345);
 				newpw = new PrintWriter(successorSocket.getOutputStream(), true);
 				newpw.println("getSuccessor");
 				succHostName = null;
+				din = new BufferedReader (
+							new InputStreamReader (successorSocket.getInputStream()));
 				while((succHostName = din.readLine()) == null);
 				if(succHostName.equals("null")){
 					break;
 				}				
 				noOfChanges++;
-			}			
+			}
+			if(succHostName.equals("null")){
+				succHostName = successorSocket.getInetAddress().getHostName();
+				successorSocket.close();
+				return succHostName;
+			}
+			Socket newPredecessor = new Socket(succHostName, 12345);
+			PrintWriter bw = new PrintWriter(newPredecessor.getOutputStream(), true);
+			bw.println("getPredecessor");
+			BufferedReader din = new BufferedReader(
+					new InputStreamReader (newPredecessor.getInputStream()));
+			succHostName = null;
+			while((succHostName = din.readLine()) == null);
+			newPredecessor.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		
 		noOfChanges--;
 		return succHostName;
 	}
@@ -393,56 +454,60 @@ public class DataGenerator extends Thread{
 	public void adjustPosition(){		
 		try {
 		String changeWith = checkPredesessor();
-		Socket newPredecessor = null;
 		PrintWriter bw;
 			if(changeWith == null){
 				//No need to change
+				noOfChanges = 0;
 				changeWith = checkSuccessor();
-				if(changeWith == null)
-					return;
-				System.out.println("Adjusting position in network");
-				System.out.println("Getting predecessor from "+changeWith);
-				newPredecessor = new Socket(changeWith, 12345);
-				bw = new PrintWriter(newPredecessor.getOutputStream(), true);
-				bw.println("getPredecessor");
-				BufferedReader din = new BufferedReader(
-						new InputStreamReader (newPredecessor.getInputStream()));
-				String pred;
-				while((pred = din.readLine()) == null);
-				if(pred.equals("null")){
-					System.out.println("Changing context root node");
-					updateContextRoot();
-					removeSelf();
+				if(changeWith == null){
+					noOfChanges = 0;
 					return;
 				}
-				System.out.println("Contacting "+pred);
-				newPredecessor.close();
-				newPredecessor = new Socket(pred, 12345);
-				bw = new PrintWriter(newPredecessor.getOutputStream(), true);
+			}
+			System.out.println("Adjusting position in network");
+			if(changeWith.equals("null")){
+				System.out.println("Changing context root node");
+				updateContextRoot();
 				removeSelf();
-				bw.println("insert");
-				newPredecessor.close();
-			}else{
-				newPredecessor = new Socket(changeWith, 12345);
-				bw = new PrintWriter(newPredecessor.getOutputStream(), true);
-				removeSelf();
-				bw.println("insert");
-			}		
+				return;
+			}
+			System.out.println("Contacting "+changeWith);
+			Socket newPredecessor = new Socket(changeWith, 12345);
+			bw = new PrintWriter(newPredecessor.getOutputStream(), true);
+			removeSelf();
+			bw.println("insert");
+			newPredecessor.close();
+			//TO DO synchronize
+			synchronized(valueObject){
+				needToken = false;
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}		
 	}	
 	
 	public void removeSelf() {
-		try(Socket pred = new Socket(predecessorHostName, 12345)){
-			PrintWriter bw = new PrintWriter(pred.getOutputStream(), true);
-			bw.println("changeSuccessor");
-			bw.println(successorHostName);
-			Socket succ = new Socket(successorHostName, 12345);
-			bw = new PrintWriter(succ.getOutputStream(), true);
-			bw.println("changePredecessor");
-			bw.println(predecessorHostName);
-			succ.close();
+		try{
+			if(predecessorHostName != null){
+				Socket pred = new Socket(predecessorHostName, 12345);
+				PrintWriter bw = new PrintWriter(pred.getOutputStream(), true);
+				bw.println("changeSuccessor");
+				if(successorHostName == null)
+					bw.println("null");
+				else
+					bw.println(successorHostName);
+				pred.close();
+			}			
+			if(successorHostName != null){
+				Socket succ = new Socket(successorHostName, 12345);
+				PrintWriter bw = new PrintWriter(succ.getOutputStream(), true);
+				bw.println("changePredecessor");
+				if(predecessorHostName == null)
+					bw.println("null");
+				else
+					bw.println(predecessorHostName);
+				succ.close();
+			}
 		} catch (IOException e)	 {
 			e.printStackTrace();
 		}		
@@ -476,11 +541,11 @@ public class DataGenerator extends Thread{
 			Socket socket = new Socket(hostName, 12345);
 			PrintWriter bw = new PrintWriter(socket.getOutputStream(), true);
 			bw.println(command);
+			socket.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
-		
+		}	
 	}
 	
 	public String readFromSocket(String hostName){
