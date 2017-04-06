@@ -41,12 +41,12 @@ public class CEPEngine extends Thread{
 				processorInstance.start();
 				//din.close();
 				long now = System.currentTimeMillis();
-				if(now - timer > 5000 && !ComplexEventProcessor.checkingUpdate){
+				/*if(now - timer > 5000 && !ComplexEventProcessor.checkingUpdate){
 					timer = now;
 					ComplexEventProcessor.checkingUpdate = true;
 					Thread updateChecker = new Thread(new ComplexEventProcessor(), "UpdateChecker");
 					updateChecker.start();
-				}
+				}*/
 			} catch (IOException e){
 				e.printStackTrace();
 			}		

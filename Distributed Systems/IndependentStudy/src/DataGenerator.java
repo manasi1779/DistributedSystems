@@ -8,6 +8,7 @@ import java.net.Socket;
 import java.util.Random;
 import java.util.Scanner;
 
+
 public class DataGenerator extends Thread{
 	
 	String context;
@@ -24,8 +25,9 @@ public class DataGenerator extends Thread{
 	static String predecessorHostName;
 	static String successorHostName;
 	static ServerSocket serverSocket;
-	static String rollingToken = null; 
 	static boolean needToken = false;
+	static Integer cachedValue = 0;
+	static Object changingPosition = new Object();
 	
 	//Fog Node
 	String rootHostName = "glados.cs.rit.edu";
@@ -103,7 +105,7 @@ public class DataGenerator extends Thread{
 				System.out.println("Getting predescessor from context root");
 				data = null;
 				while((data = rootIn.readLine()) == null);
-				predecessorHostName = rootIn.readLine();
+				predecessorHostName = data;
 				rootConnection.close();
 			}
 			System.out.println("Registered to CEPEngine "+rootHostName);
@@ -114,45 +116,48 @@ public class DataGenerator extends Thread{
 	
 	public void serveRequest(Socket socket){
 		try{
-		System.out.println(socket.getInetAddress().getHostName()+".cs.rit.edu "+"connected");
+	//	System.out.println(socket.getInetAddress().getHostName()+".cs.rit.edu "+"connected");
 		BufferedReader din = new BufferedReader (
 				new InputStreamReader (socket.getInputStream()));
-		System.out.println("Waiting for command");
+	//	System.out.println("Waiting for command");
 		String command;
 		while((command = din.readLine()) == null);
 		PrintWriter pw = new PrintWriter(socket.getOutputStream(), true);
 		switch(command){
 			case "checkValue":{
 				pw.println(checkValue());
-				System.out.println("Sending value "+value);
+		//		System.out.println("Sending value "+value);
+				socket.close();
 				break;
 			}
 			case "sendData":{
 				System.out.println("Send data request received");
 				String data = sendData();
 				pw.println(data);
+				socket.close();
 				break;
 			}
 			case "changePredecessor":{
 				String data;
 				while((data = din.readLine()) == null);
 				if(data.equals("null")){
-					predecessorHostName = null;
-					updateContextRoot();
+					predecessorHostName = null;					
 				}
 				else
 					predecessorHostName = data;				
 				System.out.println("Changed predecessor to "+predecessorHostName);
+				socket.close();
 				break;
 			}
 			case "changeSuccessor":{
 				String data;
 				while((data = din.readLine()) == null);
-				if(data == "null")
+				if(data.equals("null"))
 					successorHostName = null;
 				else
 					successorHostName = data;
 				System.out.println("Changed successor to "+successorHostName);
+				socket.close();
 				break;
 			}
 			case "getPredecessor":{
@@ -160,6 +165,7 @@ public class DataGenerator extends Thread{
 					pw.println("null");
 				else
 					pw.println(predecessorHostName);
+				socket.close();
 				break;
 			}
 			case "getSuccessor":{
@@ -167,49 +173,89 @@ public class DataGenerator extends Thread{
 					pw.println("null");
 				else
 					pw.println(successorHostName);
+				socket.close();
 				break;
 			}
 			case "insert":{
 				System.out.println("Inserting IoT "+socket.getInetAddress().getHostName()+".cs.rit.edu");
-				insert(socket);
+				synchronized(changingPosition){
+					insert(socket);
+					socket.close();
+					Thread.sleep(1000);
+				}
 				break;
 			}
 			case "getUpdate":{
 				pw.println(getUpdate());
+				socket.close();
 				break;
 			}
 			case "addIoT":{
-				addIoT(socket);
+				synchronized(changingPosition){
+					addIoT(socket);
+					socket.close();
+					Thread.sleep(1000);
+				}
 				break;
 			}
 			case "useToken":{
+			//	System.out.println("Waiting for changes");
 				String rollingchanges;
+				pw.println("getChanges");
 				while((rollingchanges = din.readLine()) == null);
-				if(needToken)
-					adjustPosition();
-				noOfChanges += Integer.parseInt(rollingchanges);
-				if(successorHostName != null){
-					Socket succ = new Socket(successorHostName, 12345);
-					PrintWriter newPw = new PrintWriter(succ.getOutputStream());
-					newPw.println("useToken");
-					newPw.println(noOfChanges);
-					succ.close();
-				}
-				else{
-					try(Socket rootsocket = new Socket(rootHostName, 12345)){
-						PrintWriter bw = new PrintWriter(rootsocket.getOutputStream(), true);
-						bw.println("releaseToken");	
-						bw.println(context);
-						bw.println(noOfChanges);
-					//	System.out.println("Sent update of "+noOfChanges);
-					} catch (IOException e) {
-						e.printStackTrace();
+				synchronized(changingPosition){
+					if(needToken){
+					System.out.println("using token");
+							adjustPosition();
+					}
+					else{
+						System.out.println("Not using token");
+					}
+					noOfChanges += Integer.parseInt(rollingchanges);				
+					if(successorHostName != null){
+						System.out.println("Passing token to successor "+successorHostName);
+						Socket succ = new Socket(successorHostName, 12345);
+						PrintWriter newPw = new PrintWriter(succ.getOutputStream(), true);					
+						newPw.println("useToken");
+						din = new BufferedReader (
+								new InputStreamReader (succ.getInputStream()));
+						String data;
+						while((data = din.readLine()) == null);
+						if(data.equals("getChanges"))
+							newPw.println(noOfChanges);
+						succ.close();
+					}
+					else{					
+						System.out.println("Giving token back to root");
+						try(Socket rootsocket = new Socket(rootHostName, 12345)){
+							PrintWriter bw = new PrintWriter(rootsocket.getOutputStream(), true);
+							bw.println("releaseToken");
+							String data;
+							din = new BufferedReader (
+									new InputStreamReader (rootsocket.getInputStream()));
+							while((data = din.readLine()) == null);
+							if(data.equals("getContext")){
+							bw.println(context);
+							}
+							data = null;
+							while((data = din.readLine()) == null);
+							if(data.equals("getChanges"))
+							bw.println(noOfChanges);
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+					noOfChanges = 0;
+					socket.close();
 					}
 				}
-				noOfChanges = 0; 
-			}
-		}}
+		}
+		
+		}
 		catch(IOException e){
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}	
 	}
@@ -220,7 +266,7 @@ public class DataGenerator extends Thread{
 				createRandomValue();
 			}
 			else{
-				System.out.println("Serve request thread");
+				//System.out.println("Serve request thread");
 				try(Socket socket = serverSocket.accept()){			
 					serveRequest(socket);	
 				} catch (IOException e) {
@@ -299,25 +345,31 @@ public class DataGenerator extends Thread{
 		System.out.println("Changing successor");
 		successorHostName = successor.getInetAddress().getHostName()+".cs.rit.edu";
 		System.out.println("New successor "+successorHostName);
-		try(Socket oldSuccessorSocket = new Socket(oldSuccessor, 12345)){			
-			// update predecessor of successor as this new insert			;
-			PrintWriter oldSuccessorpw = new PrintWriter(oldSuccessorSocket.getOutputStream(), true);
-			oldSuccessorpw.println("changePredecessor");
-			oldSuccessorpw.println(successorHostName);
+		try{			
+			if(oldSuccessor != null){
+				Socket oldSuccessorSocket = new Socket(oldSuccessor, 12345);
+				// update predecessor of successor as this new insert;
+				PrintWriter oldSuccessorpw = new PrintWriter(oldSuccessorSocket.getOutputStream(), true);
+				oldSuccessorpw.println("changePredecessor");
+				oldSuccessorpw.println(successorHostName);
+				oldSuccessorSocket.close();
+			}
 			// update predecessor of insert as self
 			PrintWriter successorpw = new PrintWriter(successor.getOutputStream(), true);
 			successorpw.println("changePredecessor");
 			successorpw.println(InetAddress.getLocalHost().getHostName()+".cs.rit.edu");
 			// update successor of insert as old successor
-			successorpw.println("changeSuccessor");
-			successorpw.println(oldSuccessor);
+			if(oldSuccessor != null){
+				successorpw.println("changeSuccessor");
+				successorpw.println("null");
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	
 	public int checkValue(){
-		return value;
+		return cachedValue;
 	}
 	
 	public void createRandomValue(){
@@ -326,7 +378,9 @@ public class DataGenerator extends Thread{
 			startTime = now;	
 			int oldValue = value;
 			synchronized(valueObject){
-				value = random.nextInt(100);			
+				value = random.nextInt(100);
+				if(cachedValue == 0)
+					cachedValue = value;
 				if(Math.abs(oldValue-value) >= precisionCoherencyRequirement )
 					needToken = true;
 			}
@@ -334,6 +388,9 @@ public class DataGenerator extends Thread{
 		}
 	}
 	
+	/**
+	 * Command by CEPEngine to new Context root
+	 */
 	public void updateContextRoot(){
 		try(Socket root = new Socket(rootHostName, 12345)){
 			PrintWriter bw = new PrintWriter(root.getOutputStream(), true);
@@ -343,14 +400,15 @@ public class DataGenerator extends Thread{
 			String data;
 			while((data = din.readLine()) == null);
 			if(data.equals("getContext")){
-				System.out.println("Sending context root");
+				System.out.println("Sending context");
 				bw.println(context);
 			}
+			bw.println("getMySuccessor");
 			data = null;
 			while((data = din.readLine()) == null);
 			successorHostName = data;
 			System.out.println("Received successor "+data);
-		} catch (IOException e) {
+		} catch (IOException e){
 			e.printStackTrace();
 		}
 	}	
@@ -359,10 +417,10 @@ public class DataGenerator extends Thread{
 		int predecessorValue;
 		Socket predecessorSocket = null;
 		String pred = predecessorHostName;
-		//This is root of context overlay
 		if(pred == null){
 			return null;
 		}
+		//This is root of context overlay
 		try {
 			while(true){
 				predecessorSocket = new Socket(pred, 12345);
@@ -380,16 +438,24 @@ public class DataGenerator extends Thread{
 				predecessorSocket = new Socket(pred, 12345);
 				newpw = new PrintWriter(predecessorSocket.getOutputStream(), true);
 				newpw.println("getPredecessor");
+				din = new BufferedReader (
+						new InputStreamReader (predecessorSocket.getInputStream()));
 				pred = null;
 				while((pred = din.readLine()) == null);		
 				predecessorSocket.close();
+				if(pred.equals("null")){
+					return pred;
+				}	
 			}			
 						
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		noOfChanges--;
-		return pred;
+		//noOfChanges--;
+		if(pred.equals(predecessorHostName))
+			return null;
+		else
+			return pred;
 	}
 	
 	public String checkSuccessor(){
@@ -401,6 +467,7 @@ public class DataGenerator extends Thread{
 		}
 		try {
 			while(true){
+			//	System.out.println("reaching for successor "+succHostName);
 				successorSocket = new Socket(succHostName, 12345);
 				PrintWriter newpw = new PrintWriter(successorSocket.getOutputStream(), true);
 				newpw.println("checkValue");
@@ -444,14 +511,13 @@ public class DataGenerator extends Thread{
 			newPredecessor.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
-		
-		
+		}		
 		noOfChanges--;
 		return succHostName;
 	}
 	
-	public void adjustPosition(){		
+	public void adjustPosition(){	
+		cachedValue = value;
 		try {
 		String changeWith = checkPredesessor();
 		PrintWriter bw;
@@ -467,17 +533,17 @@ public class DataGenerator extends Thread{
 			System.out.println("Adjusting position in network");
 			if(changeWith.equals("null")){
 				System.out.println("Changing context root node");
-				updateContextRoot();
 				removeSelf();
+				updateContextRoot();				
 				return;
 			}
+			
 			System.out.println("Contacting "+changeWith);
 			Socket newPredecessor = new Socket(changeWith, 12345);
 			bw = new PrintWriter(newPredecessor.getOutputStream(), true);
 			removeSelf();
 			bw.println("insert");
 			newPredecessor.close();
-			//TO DO synchronize
 			synchronized(valueObject){
 				needToken = false;
 			}
@@ -497,6 +563,20 @@ public class DataGenerator extends Thread{
 				else
 					bw.println(successorHostName);
 				pred.close();
+			}
+			else{
+				//Node which is changing position is root node
+				Socket cep = new Socket(rootHostName, 12345);
+				BufferedReader din = new BufferedReader(new InputStreamReader (cep.getInputStream()));
+				PrintWriter bw = new PrintWriter(cep.getOutputStream(), true);
+				bw.println("updateContextRootPassive");
+				String data;
+				while((data = din.readLine()) == null);
+				if(data.equals("getContext")){
+					bw.println(context);
+				}						
+				bw.println(successorHostName);
+				cep.close();
 			}			
 			if(successorHostName != null){
 				Socket succ = new Socket(successorHostName, 12345);
@@ -517,7 +597,7 @@ public class DataGenerator extends Thread{
 		String data  = "";		
 		try {			
 			if(successorHostName == null){
-				return ID+": "+value;
+				return ID+": "+cachedValue;
 			}
 			else{
 				Socket successorSocket = new Socket(successorHostName, 12345);
@@ -532,8 +612,8 @@ public class DataGenerator extends Thread{
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		System.out.println("Sending data "+data+" "+ID+" "+value);
-		return data+" "+ID+": "+value;
+		System.out.println("Sending data "+data+" "+ID+" "+cachedValue);
+		return ID+": "+cachedValue+" "+data;
 	}
 	
 	public void writeToSocket(String hostName, String command){

@@ -27,6 +27,7 @@ public class ComplexEventProcessor extends Thread{
  	Socket clnt;
  	int threshold = 20;
  	static boolean checkingUpdate = false;
+ 	static HashMap<String, Object> updatingRoot = new HashMap();
  	
  	static{
  		levelMap.put(0, new ArrayList<RootNode>());
@@ -52,42 +53,85 @@ public class ComplexEventProcessor extends Thread{
 	
 	private void serveRequest(String operation, Socket clnt) {
 		System.out.println(operation +"request received from "+clnt.getInetAddress().getHostName());
+		try{
 		switch(operation){
 			case "addIoT":{
 				addIoT(clnt);
+				clnt.close();
 				break;
 			}
 			case "requestData":{				
 				requestData(clnt);
+				clnt.close();
+				break;
+			}
+			case "updateContextRootPassive":{
+				updateContextRootPassive(clnt);
 				break;
 			}
 			case "updateContextRoot":{
 				updateContextRoot(clnt);
+				clnt.close();
 				break;
 			}	
 			case "releaseToken":{
-				try {
+					PrintWriter pw = new PrintWriter(clnt.getOutputStream(), true);
+					pw.println("getContext");
+					System.out.println("Token released by "+clnt.getInetAddress().getHostName());					
 					BufferedReader reader = new BufferedReader(new InputStreamReader(clnt.getInputStream()));
-					String context;				
+					String context;
+					System.out.println("Waiting for context");
 					while((context = reader.readLine()) == null);
 					String changes;
+					pw.println("getChanges");
+					System.out.println("Waiting for changes");
 					while((changes = reader.readLine()) == null);
+					System.out.println("Changes in "+context +" are "+changes);
 					currentUpdates.put(context, Integer.parseInt(changes));
-					rollToken(context);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				
+					//while(updatingRoot.get(context));
+					synchronized(updatingRoot.get(context)){
+						rollToken(context);
+					}
+					System.out.println("Rolled token for context");
+					clnt.close();
 			}
+		}		
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-		startTime = System.currentTimeMillis();				
 	}
 	
 	
+	public void updateContextRootPassive(Socket clnt) {
+		try {
+			PrintWriter pw = new PrintWriter(clnt.getOutputStream(), true);
+			pw.println("getContext");
+			BufferedReader reader = new BufferedReader(new InputStreamReader(clnt.getInputStream()));
+			System.out.println("Waiting for context for changing root of context");
+			String context;
+			while((context = reader.readLine()) == null);			
+			String newRoot;
+			while((newRoot = reader.readLine()) == null);
+			int level = contextMap.get(context);
+			String contextRoot;
+			for(RootNode root: levelMap.get(level)){
+				if(root.context.equals(context)){
+					contextRoot = root.hostName;
+					System.out.println("Changing root for "+context+" to "+newRoot);
+	/*check*/		root.hostName = newRoot;
+					break;	
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 	public void rollToken(String context){
 		int level = contextMap.get(context);
 		String contextRoot = null;
+		System.out.println("Rolling token for context "+context);
 		for(RootNode root: levelMap.get(level)){
 			if(root.context.equals(context)){
 				contextRoot = root.hostName;
@@ -96,6 +140,7 @@ public class ComplexEventProcessor extends Thread{
 					Socket rootSocket = new Socket(contextRoot, 12345);
 					PrintWriter pw = new PrintWriter(rootSocket.getOutputStream(), true);
 					pw.println("useToken");
+					pw.println("0");
 					rootSocket.close();
 				} catch (UnknownHostException e) {
 					// TODO Auto-generated catch block
@@ -119,29 +164,42 @@ public class ComplexEventProcessor extends Thread{
 			System.out.println("Waiting for context for changing root of context");
 			String context;
 			while((context = reader.readLine()) == null);
+			synchronized(updatingRoot.get(context)){
 			System.out.println("Received context "+context);
 			int level = contextMap.get(context);
 			String contextRoot = null;
 			for(RootNode root: levelMap.get(level)){
 				if(root.context.equals(context)){
 					contextRoot = root.hostName;
-					System.out.println("Changing root for "+context+" to "+contextRoot);
-	/*check*/				root.hostName = clnt.getInetAddress().getHostName()+".cs.rit.edu";
+					System.out.println("Changing root for "+context+" to "+clnt.getInetAddress().getHostName()+".cs.rit.edu");
+	/*check*/		root.hostName = clnt.getInetAddress().getHostName()+".cs.rit.edu";
 					break;	
 				}
 			}
-			//pw.println("changeSuccessor");
-			System.out.println("Changing successor of the new context root");
-			pw.println(contextRoot);
+			
+			for(RootNode root: levelMap.get(level)){
+				if(root.context.equals(context)){
+					System.out.println("Context root for "+context+ " is "+root.hostName);
+					break;	
+				}
+			}
+			//pw.println("changeSuccessor"); 
+			String command;
+			while((command = reader.readLine()) == null);
+			System.out.println("Changing successor of new context root to "+contextRoot);
+			if(command.equals("getMySuccessor"))
+				pw.println(contextRoot);			
 			pw.close();
 			clnt.close();
+			System.out.println("Changing predecessor of old context root to new context root");
 			Socket newRoot = new Socket(contextRoot, 12345);
 			PrintWriter pwNew = new PrintWriter(newRoot.getOutputStream(), true);
 			pwNew.println("changePredecessor");
 	/*check*/
+			System.out.println("New predecessor for old context root "+clnt.getInetAddress().getHostName()+".cs.rit.edu");
 			pwNew.println(clnt.getInetAddress().getHostName()+".cs.rit.edu");
-			pwNew.close();
 			newRoot.close();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}		
@@ -198,18 +256,18 @@ public class ComplexEventProcessor extends Thread{
 			while((context = din.readLine()) == null);
 			context = context.trim();
 			//bw.println(sizeMap.get(context));
+			
 			if(contextMap.containsKey(context)){
-				System.out.println("Non root");
-				bw.println("Nonroot");
-				System.out.println(contextMap.get(context));
-				ArrayList<RootNode> list = levelMap.get(contextMap.get(context));
-				System.out.println(list.size());
-				for(RootNode root: list){
-					System.out.println(root.hostName);
-					if(root.context.equals(context)){
-						addIoT(root.hostName, clnt);
-					}
-				}				
+				synchronized(updatingRoot.get(context)){
+					bw.println("Nonroot");
+					ArrayList<RootNode> list = levelMap.get(contextMap.get(context));
+						for(RootNode root: list){
+							System.out.println(root.hostName);
+							if(root.context.equals(context)){
+								addIoT(root.hostName, clnt);
+							}
+						}				
+				}
 			}
 			else{
 				System.out.println("Root Node");
@@ -217,6 +275,7 @@ public class ComplexEventProcessor extends Thread{
 				contextMap.put(context, 0);
 				popularityMap.put(context, 0);
 				associativeMap.put(context, new ArrayList<String>());
+				updatingRoot.put(context, new Object());
 				levelMap.get(0).add(new RootNode(context, clnt.getInetAddress().getHostName()+".cs.rit.edu"));
 				System.out.println("level 0 Size: "+levelMap.get(0).size());
 				lockSockets.put(context, new Object());
