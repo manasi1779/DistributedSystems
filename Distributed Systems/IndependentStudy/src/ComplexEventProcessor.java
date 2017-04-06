@@ -100,8 +100,7 @@ public class ComplexEventProcessor extends Thread{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
-	
+	}	
 	
 	public void updateContextRootPassive(Socket clnt) {
 		try {
@@ -119,7 +118,7 @@ public class ComplexEventProcessor extends Thread{
 				if(root.context.equals(context)){
 					contextRoot = root.hostName;
 					System.out.println("Changing root for "+context+" to "+newRoot);
-	/*check*/		root.hostName = newRoot;
+					root.hostName = newRoot;
 					break;	
 				}
 			}
