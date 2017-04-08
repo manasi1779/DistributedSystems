@@ -29,14 +29,14 @@ public class CEPEngine extends Thread{
 		while(true){
 			try{
 				Socket clnt = aServerSocket.accept();
-				System.out.println(clnt.getInetAddress().getHostName()+".cs.rit.edu " + "connected");
+			//	System.out.println(clnt.getInetAddress().getHostName()+".cs.rit.edu " + "connected");
 				BufferedReader din = new BufferedReader (
 						new InputStreamReader (clnt.getInputStream()));
-				System.out.println("Waiting for operation");
+		//		System.out.println("Waiting for operation");
 				String operation;
 				while((operation = din.readLine()) == null);
-				System.out.println("Received operation: "+operation);
-				System.out.println("Starting Complex Event Processor thread");
+		//		System.out.println("Received operation: "+operation);
+		//		System.out.println("Starting Complex Event Processor thread");
 				Thread processorInstance = new ComplexEventProcessor(operation, clnt);
 				processorInstance.start();
 				//din.close();

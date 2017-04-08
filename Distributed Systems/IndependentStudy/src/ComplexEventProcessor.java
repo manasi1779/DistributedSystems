@@ -35,6 +35,13 @@ public class ComplexEventProcessor extends Thread{
  		levelMap.put(2, new ArrayList<RootNode>());
  	}
  	
+ 	//TODO 
+ 	/**
+ 	 * Passing leaf node to the new context root.
+ 	 * 
+ 	 * 
+ 	 */
+ 	
 	public ComplexEventProcessor(String operation, Socket clnt) {
 		this.operation = operation;
 		this.clnt = clnt;		
@@ -45,14 +52,14 @@ public class ComplexEventProcessor extends Thread{
 	}
 
 	public void run(){
-		/*if(Thread.currentThread().getName().equals("UpdateChecker"))
+		if(Thread.currentThread().getName().equals("UpdateChecker"))
 			checkUpdates();
-		else*/
+		else
 			serveRequest(operation, clnt);
 	}	
 	
 	private void serveRequest(String operation, Socket clnt) {
-		System.out.println(operation +"request received from "+clnt.getInetAddress().getHostName());
+	//	System.out.println(operation +" request received from "+clnt.getInetAddress().getHostName());
 		try{
 		switch(operation){
 			case "addIoT":{
@@ -67,6 +74,7 @@ public class ComplexEventProcessor extends Thread{
 			}
 			case "updateContextRootPassive":{
 				updateContextRootPassive(clnt);
+				clnt.close();
 				break;
 			}
 			case "updateContextRoot":{
@@ -77,22 +85,22 @@ public class ComplexEventProcessor extends Thread{
 			case "releaseToken":{
 					PrintWriter pw = new PrintWriter(clnt.getOutputStream(), true);
 					pw.println("getContext");
-					System.out.println("Token released by "+clnt.getInetAddress().getHostName());					
+				//	System.out.println("Token released by "+clnt.getInetAddress().getHostName());					
 					BufferedReader reader = new BufferedReader(new InputStreamReader(clnt.getInputStream()));
 					String context;
-					System.out.println("Waiting for context");
+				//	System.out.println("Waiting for context");
 					while((context = reader.readLine()) == null);
 					String changes;
 					pw.println("getChanges");
-					System.out.println("Waiting for changes");
+				//	System.out.println("Waiting for changes");
 					while((changes = reader.readLine()) == null);
-					System.out.println("Changes in "+context +" are "+changes);
+				//	System.out.println("Changes in "+context +" are "+changes);
 					currentUpdates.put(context, Integer.parseInt(changes));
 					//while(updatingRoot.get(context));
 					synchronized(updatingRoot.get(context)){
 						rollToken(context);
 					}
-					System.out.println("Rolled token for context");
+				//	System.out.println("Rolled token for context");
 					clnt.close();
 			}
 		}		
@@ -130,11 +138,11 @@ public class ComplexEventProcessor extends Thread{
 	public void rollToken(String context){
 		int level = contextMap.get(context);
 		String contextRoot = null;
-		System.out.println("Rolling token for context "+context);
+	//	System.out.println("Rolling token for context "+context);
 		for(RootNode root: levelMap.get(level)){
 			if(root.context.equals(context)){
 				contextRoot = root.hostName;
-				System.out.println("Rolling token for "+context+" to "+contextRoot);
+	//			System.out.println("Rolling token for "+context+" to "+contextRoot);
 				try {
 					Socket rootSocket = new Socket(contextRoot, 12345);
 					PrintWriter pw = new PrintWriter(rootSocket.getOutputStream(), true);
@@ -142,10 +150,8 @@ public class ComplexEventProcessor extends Thread{
 					pw.println("0");
 					rootSocket.close();
 				} catch (UnknownHostException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				break;	
@@ -155,7 +161,7 @@ public class ComplexEventProcessor extends Thread{
 	
 	
 	//Set requester as root of the context and set current context root as successor of new context root
-	public void updateContextRoot(Socket clnt) {
+	public void updateContextRoot(Socket clnt){
 		try {
 			PrintWriter pw = new PrintWriter(clnt.getOutputStream(), true);
 			pw.println("getContext");
@@ -171,7 +177,7 @@ public class ComplexEventProcessor extends Thread{
 				if(root.context.equals(context)){
 					contextRoot = root.hostName;
 					System.out.println("Changing root for "+context+" to "+clnt.getInetAddress().getHostName()+".cs.rit.edu");
-	/*check*/		root.hostName = clnt.getInetAddress().getHostName()+".cs.rit.edu";
+					root.hostName = clnt.getInetAddress().getHostName()+".cs.rit.edu";
 					break;	
 				}
 			}
@@ -194,7 +200,6 @@ public class ComplexEventProcessor extends Thread{
 			Socket newRoot = new Socket(contextRoot, 12345);
 			PrintWriter pwNew = new PrintWriter(newRoot.getOutputStream(), true);
 			pwNew.println("changePredecessor");
-	/*check*/
 			System.out.println("New predecessor for old context root "+clnt.getInetAddress().getHostName()+".cs.rit.edu");
 			pwNew.println(clnt.getInetAddress().getHostName()+".cs.rit.edu");
 			newRoot.close();
@@ -265,7 +270,11 @@ public class ComplexEventProcessor extends Thread{
 							if(root.context.equals(context)){
 								addIoT(root.hostName, clnt);
 							}
-						}				
+						}
+					sizeMap.put(context, sizeMap.get(context)+1);
+					if(sizeMap.get(context) == 3){
+						rollToken(context);
+					}
 				}
 			}
 			else{
@@ -275,11 +284,12 @@ public class ComplexEventProcessor extends Thread{
 				popularityMap.put(context, 0);
 				associativeMap.put(context, new ArrayList<String>());
 				updatingRoot.put(context, new Object());
+				sizeMap.put(context, 1);
 				levelMap.get(0).add(new RootNode(context, clnt.getInetAddress().getHostName()+".cs.rit.edu"));
 				System.out.println("level 0 Size: "+levelMap.get(0).size());
 				lockSockets.put(context, new Object());
 				clnt.close();
-				rollToken(context);
+		//		rollToken(context);
 			}
 			System.out.println("Added IoT "+clnt.getInetAddress().getHostName());
 		} catch (IOException e) {
@@ -338,14 +348,79 @@ public class ComplexEventProcessor extends Thread{
 				if(root.context.equals(context)){	
 					synchronized(lockSockets.get(context)){
 						data = prepareData(root.hostName);
+						cache.put(context, data);
 						//updateLevel(context);
+						analysePattern(data, context);
 					}
-					for(String otherContext: associativeMap.get(context)){
+					/*for(String otherContext: associativeMap.get(context)){
 						cacheContext(otherContext);
-					}
+					}*/
 				}
 			}
 		return data;
+	}
+
+	/**
+	 * Identify associativity between different contexts by finding 
+	 * edit distance defined by longest common subsequence
+	 * @param data
+	 * @param context
+	 */
+	public void analysePattern(String data, String context) {
+		String[] pattern1 = getOnlyIoTIDs(data);
+		System.out.println(data);
+		for(String otherContext: cache.keySet()){
+			System.out.println("Checking for context "+otherContext);
+			if(!otherContext.equals(context)){
+				String[] pattern2 = getOnlyIoTIDs(cache.get(otherContext));
+				System.out.println("Finding subsequence between "+context +" and "+otherContext);
+				int matchLength = getLongestMatchingSubSequence(pattern1, pattern2);
+				if(matchLength >= cache.get(context).split(" ").length/2){
+					System.out.println("Found associativity between "+context +" and "+otherContext);
+					associativeMap.get(context).add(otherContext);
+					associativeMap.get(otherContext).add(context);
+				}
+				else{
+					System.out.println("No associativity between "+context +" and "+otherContext);
+				}				
+			}
+		}		
+	}
+	
+	public String[] getOnlyIoTIDs(String data){
+		String blocks[] = data.split(" ");
+		String output[] = new String[blocks.length];
+		int i =0;
+		for(String block:blocks){
+			output[i] = block.substring(0, block.indexOf(":"));
+			i++;
+		}
+		return output;
+	}
+	
+	public static int getLongestMatchingSubSequence(String[] pattern1, String[] pattern2){
+		String subsequence = "";
+		int matchSize[][]  = new int[pattern1.length + 1][pattern2.length + 1];
+		for(int i = 0; i < pattern1.length+1; i++){
+			for(int j = 0; j < pattern2.length+1; j++){
+				if (i == 0 || j == 0)
+					matchSize[i][j] = 0;
+				else if(pattern1[i-1].equals(pattern2[j-1])){
+					matchSize[i][j] = matchSize[i-1][j-1] + 1;
+				}
+				else{
+					int max = Math.max(matchSize[i][j-1], matchSize[i-1][j]);
+					matchSize[i][j] = max;
+				}
+			}
+		}
+		for(int j = 0; j < pattern2.length; j++){
+			if(matchSize[pattern1.length][j] +1 == matchSize[pattern1.length][j+1]){
+				subsequence += ":"+pattern2[j];
+			}
+		}
+		System.out.println("Matching pattern: "+subsequence);
+		return matchSize[pattern1.length][pattern2.length];
 	}
 
 	private String prepareData(String rootHostName){
